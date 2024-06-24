@@ -1,0 +1,79 @@
+#Larvae dor choice experiment
+#In Gowri et al, 2019. https://doi.org/10.1111/evo.13861
+
+#Data exploration and package loading
+library(lme4) #models
+library(rcompanion) #model pvalue
+library(car) #model pvalue
+library(multcompView) #post-hoc
+library(lsmeans) #post-hoc
+library(Rmisc) #for summarySE
+library(geepack) #for model with correlated data 
+library(contrast) #for posthoc
+library(coin) #For permutation t tests
+
+summarySE(data=data,measurevar="eggnb",groupvars=c("treatment","plant"),conf.interval=0.95)
+summarySE(data=data,measurevar="choice",groupvars=c("treatment","ovipoplant","parent"),conf.interval=0.95)
+summarySE(data=data,measurevar="eggnb",groupvars="plant",conf.interval=0.95)
+summarySE(data=data,measurevar="choice",groupvars=c("treatment","day"),conf.interval=0.95)
+
+data$treatment<-as.factor(data$treatment) #make sure treatment is factor
+data$ovipoplant<-as.factor(data$ovipoplant)
+data$parent<-as.factor(data$parent)
+data$day<-as.factor(data$day) #make day a factor and not a numeric variable
+summary(data)
+head(data)
+str(data)
+
+#Test naive preference with Chi-squared
+observed=c(20,26) #here, input the observed number of choice for odor first, control second
+theoretical=c(0.5,0.5) #here the theoretical proportions we compare the data to
+test=chisq.test(x=observed,p=theoretical)#perform the test
+test
+test=GTest(x=observed,p=theoretical)
+test
+test$expected #gives you the expected values if our data were following the theoretical proportions
+
+#Test naive preference with Fisher test (from reviewers)
+data=rbind(c(82,99),c(90.5,90.5))
+colnames(data)=c("controlchosen","bananachosen")
+rownames(data)=c("observed","random")
+data
+fisher.test(data)
+
+#Fit the models for parent choices
+modelfull<-glm(choice~treatment*day,family=binomial(link="logit"),data=data)
+modelfull2<-glm(choice~treatment*day,family=quasibinomial,data=data)
+anova(modelfull,test="Chisq",type="II",test="LR")
+anova(modelfull2,test="Chisq",type="II",test="LR")
+summary(modelfull)
+summary(modelfull2)
+
+#Models for offspring choices
+modelfull<-glmer(choice~treatment*parent*ovipoplant+(1|family),family=binomial(link="logit"),nAGQ=1,data=data)
+modelfixed<-glm(choice~treatment*parent*ovipoplant,family=binomial(link="logit"),data=data)
+model2<-glm(choice~treatment+ovipoplant,family=binomial(link="logit"),data=data)      
+Anova(modelfull)
+anova(modelfull,modelfixed)
+
+#Post-hoc multiple comparison
+posthoc=lsmeans(modelfull,pairwise~treatment*day)
+posthoc=lsmeans(modelfull,pairwise~treatment:parent:ovipoplant,adjust="tukey")
+posthoc
+
+#Test oviposition choice
+difference=mango-control 
+differencelog=logmango-logcontrol
+differencesqrt=sqrtmango-sqrtcontrol
+plotNormalHistogram(difference,xlab="difference(mango-control)") #Check normality of the difference between the two paired groups
+plotNormalHistogram(differencelog,xlab="differencelog(logmango-logcontrol)")
+plotNormalHistogram(difference,xlab="differencesqrt(sqrtmango-sqrtcontrol)")
+shapiro.test(difference)
+shapiro.test(differencelog)
+shapiro.test(differencesqrt)
+
+t.test(data$control,data$mango,paired=TRUE,conf.level=0.95)
+t.test(data$logcontrol,data$logmango,paired=TRUE,conf.level=0.95)
+wilcox.test(data$control,data$mango,paired=TRUE)
+
+
