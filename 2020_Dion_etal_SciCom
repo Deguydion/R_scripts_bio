@@ -1,0 +1,81 @@
+#Data analysis of female mate choice for several male blends and preference analysis
+#Dion et al, 2020, https://www.nature.com/articles/s41467-019-13801-2
+#In R v. 3.2.448 implemented in RStudio v.1.0.136
+
+#Packages
+library(lme4)
+library(car)
+library(dplyr)
+library(lmtest)
+library(rcompanion)
+library(nlme)
+library(multcomp)
+library(lsmeans)
+library(Rmisc)
+library(DescTools)
+
+
+#Data loading observation
+attach(data)
+summary(data)
+head(data)
+str(data)
+summarySE(data=data,measurevar="choice",groupvars=c("treatment"),conf.interval=0.95)
+summarySE(data=data,measurevar="choice",groupvars=c("treatment"),conf.interval=0.95,na.rm=TRUE)
+
+#Preference tests for each treatment group
+observed=c(7,31)
+theoretical=c(0.5,0.5)
+test=chisq.test(x=observed,p=theoretical)
+test
+test$expected
+
+#Models for choice analysis
+modelfull=glmer(choice~treatment+age+(1|family),data=data,family="binomial"(link="logit"),control=glmerControl(optimizer="bobyqa"),nAGQ=1)
+modelfull=glmer(choice~treatment+age+nbposition+(1|family),data=data,family="binomial"(link="logit"),control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+modelfull=glmer(choice~treatment+age+nbposition+(1|family),data=data,family="binomial"(link="logit"),REML=FALSE,control=glmerControl(optimizer="bobyqa"),nAGQ=1)
+modelfull=glmer(choice~treatment+age+position+(1|family),data=data,family="quasibinomial"(link="logit"),REML=FALSE,control=glmerControl(optimizer="bobyqa"),nAGQ=1)
+modelfinal=glm(choice~treatment,data=data,family="binomial"(link="logit"))
+
+
+Anova(modelfull)
+summary(modelfull)
+nagelkerke(modelfull)
+Anova(modelfull,type="II",test="LR")
+Anova(modelfull,type="II",test="Chisq")
+rand(modelfull)
+anova(modelfull,update(modelfull,~1),test="Chisq")
+
+
+#Posthoc analysis
+posthoc=lsmeans(modelfull,pairwise~treatment,adjust="tukey") 
+posthoc
+cld(posthoc,alpha=0.05,Letters=letters)
+p.value=c()
+p.adj=p.adjust(p.value,method="fdr")
+p.adj = signif(p.adj,2)
+p.adj
+
+#Modelfit
+hoslem.test(data$choice,fitted(modelfull))
+hoslem.test(data$choice,fitted(modelfinal))
+plot(fitted(modelfinal),rstandard(modelfinal))
+
+#Boxplots
+boxplot(msp1~msp,data=data)
+means<-tapply(data$msp1,data$msp,mean)
+points(means,col="black",pch=19,cex=1.5)
+stripchart(msp1~msp,data=data,vertical=TRUE,method="jitter",pch=21,col="black",bg="white",add=TRUE)
+
+boxplot(msp2~msp,data=data)
+means<-tapply(data$msp2,data$msp,mean)
+points(means,col="black",pch=19,cex=1.5)
+stripchart(msp2~msp,data=data,vertical=TRUE,method="jitter",pch=21,col="black",bg="white",add=TRUE)
+
+boxplot(msp3~msp,data=data)
+means<-tapply(data$msp3,data$msp,mean)
+points(means,col="black",pch=19,cex=1.5)
+stripchart(msp3~msp,data=data,vertical=TRUE,method="jitter",pch=21,col="black",bg="white",add=TRUE)
+detach(data)
+
+
