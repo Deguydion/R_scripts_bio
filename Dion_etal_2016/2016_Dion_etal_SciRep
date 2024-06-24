@@ -1,0 +1,96 @@
+MANOVA for analysis sex pheromone amounts in different seasonal forms, from 1.	Dion E, Monteiro A, Yew JY. Phenotypic plasticity in sex pheromone production in Bicyclus anynana butterflies. Sci Rep. 2016;6:39002 
+
+#Loading and reading the data
+summary(data)
+head(data)
+names(data)
+str(data)
+colnames(data)
+hist(data$msp1on3)
+hist(data$msp2on1)
+hist(data$msp2on3)
+
+#Building boxplots
+boxplot(msp1fw~season,data=data,xlab="Seasonal form", ylab="MSP1 amount on FW")
+ylim=c(ymin, ymax) 
+means<-tapply(data$msp1fw,data$season,mean)
+points(means,col="black",pch=18)
+
+#Multivariate normality tests
+library(MVN)
+Y<-cbind(temperature,humidity,pm)
+Y1<-cbind(msp1fw,msp2fw,msp3fw)
+Y2<-cbind(msp1hw,msp2hw,msp3hw)
+Y3<-cbind(msp1on3,msp2on1,msp2on3)
+
+
+
+assump1<-mvn(Y,mvnTest=c("mardia"),covariance=TRUE,univariateTest=c("SW"))
+assump1
+assump2<-mvn(Y2,mvnTest=c("hz"),covariance=TRUE,univariateTest=c("CVM"),transform="none")
+assump2
+assump3<-mvn(Y3,mvnTest=c("royston"),covariance=TRUE,univariateTest=c("Lillie"),transform="none")
+assump3
+
+assump2<-mardiaTest(Y2,qqplot=TRUE)
+assump2
+assump3<-mardiaTest(Y3,qqplot=TRUE)
+assumpt1<-hzTest(Y1,qqplot=FALSE)
+assumpt1
+assumpt2<-hzTest(Y2,qqplot=FALSE)
+assumpt2
+assumpt3<-hzTest(Y3,qqplot=FALSE)
+assumpt3
+assumpt4<-hzTest(Y4,qqplot=FALSE)
+assumpt4
+
+assumpti1<-roystonTest(Y1,qqplot=FALSE)
+assumpti2<-roystonTest(Y2,qqplot=FALSE)
+assumpti3<-roystonTest(Y3,qqplot=FALSE)
+
+
+uniPlot(Y,type="qqplot")# creates univariate Q-Q plots
+uniPlot(Y1,type="histogram")# creates univariate histograms
+uniNorm(Y1,type="SW",desc=TRUE)# perform sw normality test on each variable
+
+
+#Run the MANOVA
+data.manova1<-manova(Y~treatment,data=data)
+data.manova2<-manova(Y2~season,data=data)#one-way MANOVA
+summary(data.manova1)
+summary(data.manova2)
+data.manova<-manova(Y1~pupaltemp*adulttemp,data=data)#two-way MANOVA
+
+
+#Different tests available#
+summary(data.manova1,test="Hotelling-Lawley")
+summary(data.manova1,test="Roy")
+summary(data.manova1,test="Pillai")
+summary(data.manova1,test="Wilks")
+
+#Checking which group differ (here, which msp are different)
+summary.aov(data.manova1)
+summary.aov(data.manova2)
+
+#Doing pairwise comparison of variable effect (here WS, DS or WS17, DS27)
+data.manova2<-manova(Y2~season,data=data,subset=season %in% c("ws27","ds27"))
+
+#Calculate effect sizes for MANOVA
+install.packages("heplots")
+library(heplots)
+etasq(data.manova1)
+
+#Bonferroni and other corrections
+data2<-read.table("pvalmsp1_hwmach1.txt",header=TRUE)
+attach(data2)
+data2.order = data2[order(data2$msp1pval),] #order data by p value
+library(FSA)
+headtail(data2.order)#order data from lower to higher p value - use when more than 2 data
+
+data2$Bonferroni=p.adjust(data2$msp3,method="bonferroni")
+data2$BH=p.adjust(data2$msp3,method="BH")
+data2$Holm=p.adjust(data2$msp3,method="holm")
+data2$Hochberg=p.adjust(data2$msp3,method="hochberg")
+data2$Hommel=p.adjust(data2$msp3,method="hommel")
+data2$BY=p.adjust(data2$msp3,method="BY")
+data2
