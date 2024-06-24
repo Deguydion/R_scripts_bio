@@ -1,10 +1,8 @@
 ## The script is the data analysis for the article:
-## Gowri V, Dion E, Viswanath A, Piel FM, Monteiro A. 
-## Transgenerational inheritance of learned preferences for novel host plant odors in Bicyclus anynana butterflies.
-## Evolution. 2019;73(12):2401-14.
+## Gowri V, Dion E, Viswanath A, Piel FM, Monteiro A. Transgenerational inheritance of learned preferences for novel host plant odors in Bicyclus anynana butterflies. Evolution. 2019;73(12):2401-14.
 ## (Gowri & Dion are co 1st authors)
 
-### METHODS:
+### Methods:
 **Odor choice assay:** 
 Odor choice assays were performed at different stages of larval development, from naive emerged to 5th instar. 
 Each assay was performed using a Petri dish, on which a central line was drawn, two more lines, equally spaced from the central line, were drawn on either side of it. 
@@ -13,7 +11,7 @@ One side of the Petri dish had a small piece of a control leaf coated in ethanol
 **Oviposition choice assay:** 
 Done on mated adults. The butterflies were given two options with regard to oviposition site: control leaves or odor leaves in a test cage.
 
-### STATISTICAL ANALYSIS:
+### Statistical analysis:
 **Testing for an appropriate control treatment**
 Changes in proportions of larvae choosing ethanol-coated leaves over noncoated leaves over larval development (day 5, 10, 15, and   20) were analyzed with a two-tailed 
 Fisher exact test of independence followed by an adjusted pairwise nominal independence post hoc analysis.
