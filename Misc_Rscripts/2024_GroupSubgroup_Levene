@@ -1,0 +1,32 @@
+#LEVENE TEST WITH SUBGROUPS AND GROUPS
+#Data used: glomeruli(=globe) volume
+#dataframe is 3 columns: treatment (Wt, NB2 etc), globe ID and volume
+#2024
+
+#Package loading
+library(Rmisc)
+library(car)
+
+#Data loading 
+setwd("C:/Users/molen/Desktop")
+data<-read.csv("globe.csv",header=TRUE)
+head(data)
+summarySE(data=data,measurevar="volume",groupvars=c("treatment","globe"),conf.interval=0.95,na.rm=TRUE)
+
+# Function to perform Levene's test on each subgroup within each group
+levene_treatment <- function(group_data) {
+  return(leveneTest(volume ~ treatment, data = group_data)$`Pr(>F)`[1])
+}
+
+# Split the data by Group
+globe_split <- split(data,data$globe)
+
+# Apply the function to each group separately
+globe_p_values <- sapply(globe_split, function(group_data) {
+  return(levene_treatment(group_data))  # Perform Levene's test on subgroups within the current group
+})
+
+# Print detailed p-values for each subgroup comparison within each group
+print(globe_p_values)
+write.table(globe_p_values,file = "levene_WtvsNB2.txt", row.names = TRUE, col.names = FALSE)
+  
