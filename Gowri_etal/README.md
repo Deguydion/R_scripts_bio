@@ -1,8 +1,8 @@
-The script is the data analysis for the article:
-Gowri V, Dion E, Viswanath A, Piel FM, Monteiro A. 
-Transgenerational inheritance of learned preferences for novel host plant odors in Bicyclus anynana butterflies.
-Evolution. 2019;73(12):2401-14.
-(Gowri & Dion are co 1st authors)
+###The script is the data analysis for the article:
+###Gowri V, Dion E, Viswanath A, Piel FM, Monteiro A. 
+###Transgenerational inheritance of learned preferences for novel host plant odors in Bicyclus anynana butterflies.
+###Evolution. 2019;73(12):2401-14.
+###(Gowri & Dion are co 1st authors)
 
 METHODS:
 Odor choice assay: 
