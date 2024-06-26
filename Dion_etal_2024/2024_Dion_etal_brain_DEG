@@ -1,0 +1,337 @@
+#BRAIN DEG AND GO ENRICHMENT ANALYZES 
+#gene and transcript count matrices from the hisat+stringtie pipeline
+#fRO dION ET AL, 2024 PAPER (in prep)
+
+#1. DEG ANALYSIS
+
+#Preparing samples and leading packages
+setwd("C:/Users/molen/Desktop/transcriptomics_analysis/Quantification output files/Quantification_v2_brains")
+list.files("C:/Users/molen/Desktop/transcriptomics_analysis/Quantification output files/Quantification_v2_brains")
+library(DESeq2)
+library(ggplot2)
+library(pheatmap)
+library(EnhancedVolcano)
+library(RColorBrewer)
+library(vsn)
+
+brain_countData <-as.matrix(read.csv("brain_gene_count_matrix2.csv",row.names="gene_id"))
+brain_countData <-as.matrix(read.csv("brain_gene_count_matrix_noRibo.csv",row.names="gene_id")) #ribosomal genes removed
+brain_colData<-read.csv("brain_pheno_data.csv",row.names=1)
+brain_colData<-read.csv("brain_pheno_data2.csv",row.names=1)#MB1, NBB1 and NCB4 removed
+head(brain_countData)
+head(brain_colData)
+
+#Check that all sample IDs in colData are also in CountData and match their orders
+all(rownames(brain_colData) %in% colnames(brain_countData))
+brain_countData <- brain_countData[, rownames(brain_colData)]
+all(rownames(brain_colData) == colnames(brain_countData))
+
+#Create a DESeqDataSet from count matrix and labels
+brain_dds<-DESeqDataSetFromMatrix(countData=brain_countData,colData=brain_colData,design=~treatment)
+
+#Pre-filtering of low count genes. Rows with less than 10 reads in total are removed
+brain_keep<-rowSums(counts(brain_dds)) >= 10
+brain_dds<-brain_dds[brain_keep,]
+
+#Generate the Desq2 normalized counts (this is for extra analysis, during DE normalization is done in the glm)
+brain_dds<-estimateSizeFactors(brain_dds)
+sizeFactors(brain_dds) #normalization factors of each sample 
+normalized_brain_counts<-counts(brain_dds,normalized=TRUE)#retrieve the normalized counts matrix
+write.table(normalized_brain_counts,file="brain_normalized_counts.txt",sep="\t",quote=F,col.names=NA)
+
+colSums(counts(brain_dds)) # Total number of raw counts per sample
+colSums(counts(brain_dds,normalized=T))# Total number of normalized counts per sample
+
+
+#Data quality assessment and visualization 
+#Data transformation
+brain_rld<-rlog(brain_dds,blind=TRUE)
+brain_rld_false<-rlog(brain_dds,blind=FALSE)
+head(assay(brain_rld),3)
+head(assay(brain_rld_false),3)
+
+#Principal component analysis PCA 
+plotPCA(brain_rld, intgroup="treatment")
+plotPCA(brain_rld, intgroup="treatment") + geom_text(aes(label=name))
+plotPCA(brain_rld_false, intgroup="treatment")
+plotPCA(brain_rld_false, intgroup="treatment") + geom_text(aes(label=name))
+plotPCA(brain_rld, intgroup="treatment",ntop=5000)
+plotPCA(brain_rld, intgroup="treatment",ntop=5000) + geom_text(aes(label=name))
+
+pcaData<-plotPCA(brain_rld,intgroup="treatment",ntop=500,returnData=TRUE)
+pcaData<-plotPCA(brain_rld,intgroup="treatment",ntop=5000,returnData=TRUE)
+percentVar<-round(100 * attr(pcaData, "percentVar"))
+ggplot(pcaData,aes(PC1, PC2, color=treatment)) +
+  geom_point(size=5) +
+  scale_color_manual(values = c("#BBBBBB","#000000","#009988","#0177BB","#EE7733")) +
+  xlab(paste0("PC1: ",percentVar[1],"% variance")) +
+  ylab(paste0("PC2: ",percentVar[2],"% variance")) +
+  coord_fixed() +
+  theme(text=element_text(size=20))
+ggsave(pcaData,filename='PCA.eps')
+
+#Heatmap of the count matrix
+brain_rld_mat <- assay(brain_rld) #extract rlog matrix from the object
+brain_rld_cor <- cor(brain_rld_mat) # Compute pairwise correlation values
+head(brain_rld_cor)
+pheatmap(brain_rld_cor, annotation = brain_colData)
+
+
+brain_dds<-estimateSizeFactors(brain_dds)
+brain_ntd<-normTransform(brain_dds)
+brain_select<-order(rowMeans(counts(brain_dds,normalized=TRUE)),decreasing=TRUE)[1:20]
+brain_df<-as.data.frame(colData(brain_dds)[("treatment")])
+pheatmap(assay(brain_ntd)[brain_select,],cluster_rows=FALSE,show_rownames=FALSE,cluster_cols=FALSE,annotation_col=brain_df)
+pheatmap(assay(brain_rld)[brain_select,],cluster_rows=FALSE,show_rownames=FALSE,cluster_cols=FALSE,annotation_col=brain_df)
+
+
+#Heatmap of the sample-to-sample distances
+brain_sampleDists <- dist(t(assay(brain_rld)))
+brain_sampleDistMatrix <- as.matrix(brain_sampleDists)
+rownames(brain_sampleDistMatrix) <- paste(brain_rld$treatment,sep="-")
+colnames(brain_sampleDistMatrix) <- NULL
+colors<-colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
+pheatmap(brain_sampleDistMatrix,clustering_distance_rows=brain_sampleDists,clustering_distance_cols=brain_sampleDists,col=colors)
+
+#Heatmap all genes
+ann_colors = list(sex=c(female="#660000",male="#003300"),treatment=c(male="lightgrey",naive_fem="black",wt_exp_fem="#EE7733",nb1_exp_fem="#009988",nb2_exp_fem="#0177BB"))
+temp_hm=pheatmap(brain_rld_mat,border=NA,scale ="row",annotation_colors = ann_colors,color = colorRampPalette(c("purple","purple", "black","yellow","yellow"))(100), annotation=brain_colData,show_rownames=FALSE,show_colnames = TRUE,annotation_names_col=FALSE,annotation_legend = TRUE)
+temp_hm
+ggsave(temp_hm,width=6,height=6,filename='all_heat.tiff') # Save images
+ggsave(temp_hm,width=6,height=6,filename='all_heat.eps')
+
+
+#Plot of individual gene counts 
+d<-plotCounts(brain_dds,gene="MSTRG.18812",intgroup="treatment",returnData=TRUE)
+ggplot(d,aes(x=treatment, y=count)) +
+  geom_point(aes(color=treatment),position=position_jitter(w=0.1,h=0),size=2.5) +
+  scale_x_discrete(limits=c("male", "naive_fem", "wt_exp_fem","nb1_exp_fem","nb2_exp_fem")) +
+  scale_color_manual(values=c("darkgrey","black","#08B59C","#0796DD","#F49867"))+
+  theme(panel.background= element_rect(fill = "white", colour = "black"),panel.grid.major=element_line(size=0.5,linetype ='dashed',colour="grey"))+
+  theme(text=element_text(size=14,face="bold"))+
+  labs(subtitle="MSTRG.18812")
+
+#DESEQ analysis and shrinkage for visualization and ranking of genes
+
+#Males versus naive females
+brain_dds <- DESeq(brain_dds)
+resultsNames(brain_dds) # to see what names to use
+brain_res_mvsnaive <- results(brain_dds, contrast=c("treatment","naive_fem","male"),alpha=0.05)#Males=base, results are changes in females
+summary(brain_res_mvsnaive) #Print a summary of the contrast analyse
+brain_res_mvsnaive <- brain_res_mvsnaive[order(brain_res_mvsnaive$pvalue),]#Re-ordering the result datasets by the smallest p-values
+write.csv(as.data.frame(brain_res_mvsnaive),file="brain_mvsnaive_DEG.csv")#Exporting the results to csv files
+resLFC_brain_NvsM<-lfcShrink(brain_dds,coef = "treatment_naive_fem_vs_male",type="apeglm")
+resLFC_brain_NvsM<-resLFC_brain_NvsM[order(resLFC_brain_NvsM$pvalue),]
+write.csv(as.data.frame(resLFC_brain_NvsM),file="resLFC_brain_mvsnaive_DEG.csv")
+
+#Naive females versus Wt-exp
+brain_dds$treatment<-relevel(brain_dds$treatment,ref="naive_fem") #Adjust factor level for shrinkage purposes, here naive vs wt
+brain_dds <- DESeq(brain_dds)
+resultsNames(brain_dds)
+brain_res_naivevswt <- results(brain_dds,contrast=c("treatment","wt_exp_fem","naive_fem"),alpha=0.05) #changes in wt females
+summary(brain_res_naivevswt)
+brain_res_naivevswt <- brain_res_naivevswt[order(brain_res_naivevswt$pvalue),]
+write.csv(as.data.frame(brain_res_naivevswt),file="brain_naivevswt_DEG.csv")
+resLFC_brain_NvsWt<-lfcShrink(brain_dds,coef = "treatment_wt_exp_fem_vs_naive_fem",type="apeglm")
+resLFC_brain_NvsWt<-resLFC_brain_NvsWt[order(resLFC_brain_NvsWt$pvalue),]
+write.csv(as.data.frame(resLFC_brain_NvsWt),file="resLFC_brain_nvswt_DEG.csv")
+
+#Wt-exp versus nb1- and nb2-exposed 
+brain_dds$treatment<-relevel(brain_dds$treatment,ref="wt_exp_fem")
+brain_dds <- DESeq(brain_dds)
+resultsNames(brain_dds)
+brain_res_wtvsnb1 <- results(brain_dds, contrast=c("treatment","nb1_exp_fem","wt_exp_fem"),alpha=0.05) #changes in NB1
+brain_res_wtvsnb2 <- results(brain_dds, contrast=c("treatment","nb2_exp_fem","wt_exp_fem"),alpha=0.05) #changes in NB2
+summary(brain_res_wtvsnb1)
+summary(brain_res_wtvsnb2)
+brain_res_wtvsnb1 <- brain_res_wtvsnb1[order(brain_res_wtvsnb1$pvalue),]
+brain_res_wtvsnb2 <- brain_res_wtvsnb2[order(brain_res_wtvsnb2$pvalue),]
+write.csv(as.data.frame(brain_res_wtvsnb2),file="brain_wtvsnb2_DEG.csv")
+write.csv(as.data.frame(brain_res_wtvsnb1),file="brain_wtvsnb1_DEG.csv")
+resLFC_brain_wtvsnb1<-lfcShrink(brain_dds,coef = "treatment_nb1_exp_fem_vs_wt_exp_fem",type="apeglm")
+resLFC_brain_wtvsnb2<-lfcShrink(brain_dds,coef = "treatment_nb2_exp_fem_vs_wt_exp_fem",type="apeglm")
+resLFC_brain_wtvsnb1 <- resLFC_brain_wtvsnb1[order(resLFC_brain_wtvsnb1$pvalue),]
+resLFC_brain_wtvsnb2 <- resLFC_brain_wtvsnb2[order(resLFC_brain_wtvsnb2$pvalue),]
+write.csv(as.data.frame(resLFC_brain_wtvsnb1),file="resLFC_brain_wtvsnb1_DEG.csv")
+write.csv(as.data.frame(resLFC_brain_wtvsnb2),file="resLFC_brain_wtvsnb2_DEG.csv")
+
+#nb1-exp versus nb2-exposed females
+brain_dds$treatment<-relevel(brain_dds$treatment,ref="nb1_exp_fem")
+brain_dds <- DESeq(brain_dds)
+resultsNames(brain_dds)
+brain_res_nb1vsnb2 <- results(brain_dds, contrast=c("treatment","nb1_exp_fem","nb2_exp_fem"),alpha=0.05) #Changes in NB1
+summary(brain_res_nb1vsnb2)
+brain_res_nb1vsnb2 <- brain_res_nb1vsnb2[order(brain_res_nb1vsnb2$pvalue),]
+write.csv(as.data.frame(brain_res_nb1vsnb2),file="brain_nb1vsnb2_DEG.csv")
+resLFC_brain_nb1vsnb2<-lfcShrink(brain_dds,coef = "treatment_nb2_exp_fem_vs_nb1_exp_fem",type="apeglm")
+write.csv(as.data.frame(resLFC_brain_nb1vsnb2),file="resLFC_brain_nb1vsnb2_DEG.csv")
+
+
+#BUILDING DEG PLOTS
+
+#MA plots
+plotMA(resLFC_brain_NvsM,ylim=c(-4,3),cex=0.75,cex.lab=1.5,cex.axis=1.5)
+plotMA(resLFC_brain_NvsWt,ylim=c(-2.5,5),cex=0.75,cex.lab=1.5,cex.axis=1.5)
+plotMA(resLFC_brain_wtvsnb1,ylim=c(-2,5),cex=0.75,cex.lab=1.5,cex.axis=1.5)
+plotMA(resLFC_brain_wtvsnb2,ylim=c(-1,4),cex=0.75,cex.lab=1.5,cex.axis=1.5)
+plotMA(resLFC_brain_nb1vsnb2,ylim=c(-1,6),cex=0.75,cex.lab=1.5,cex.axis=1.5)
+
+
+#Volcanoe plots  
+#To remove all the labels, use NA for select lab
+EnhancedVolcano(res_brain_NvsM,
+                lab = rownames(resLFC_brain_NvsM),
+                x = 'log2FoldChange',
+                y = 'padj',
+                selectLab = c(NA),
+                xlab = bquote(~Log[2]~ 'fold change'),
+                xlim = c(-4, 4),
+                ylim = c(0, -log10(10e-7)),
+                pCutoff = 50e-3,
+                FCcutoff = 0.0,
+                pointSize = 2,
+                labSize = 2.0,
+                labCol = 'black',
+                labFace = 'bold',
+                boxedLabels = FALSE,
+                colAlpha = 4/5,
+                legendPosition = 'none',
+                legendLabSize = 14,
+                legendIconSize = 4.0,
+                typeConnectors ='closed',
+                drawConnectors = TRUE,
+                widthConnectors = 0.5,
+                colConnectors = 'black',
+                col=c('black','grey','grey','black'),
+                subtitle = NULL,
+                title=NULL)
+
+EnhancedVolcano(brain_res_naivevswt,
+                lab = rownames(brain_res_naivevswt),
+                x = 'log2FoldChange',
+                y = 'padj',
+                selectLab = c(NA),
+                xlab = bquote(~Log[2]~ 'fold change'),
+                xlim = c(-5, 5),
+                ylim = c(0, -log10(10e-5)),
+                pCutoff = 50e-3,
+                FCcutoff = 0.0,
+                pointSize = 4,
+                labSize = 3.0,
+                labCol = 'black',
+                labFace = 'bold',
+                boxedLabels = FALSE,
+                colAlpha = 4/5,
+                legendPosition = 'none',
+                legendLabSize = 14,
+                legendIconSize = 4.0,
+                typeConnectors ='closed',
+                drawConnectors = TRUE,
+                widthConnectors = 0.5,
+                colConnectors = 'black',
+                col=c('black','grey','grey','darkorange2'),
+                subtitle = NULL,
+                title=NULL) +
+                theme(axis.line=element_line(size=1.5)) +
+                theme(axis.text=element_text(size = 10))
+
+EnhancedVolcano(brain_res_wtvsnb1,
+                lab = rownames(brain_res_wtvsnb1),
+                x = 'log2FoldChange',
+                y = 'padj',
+                selectLab = c(NA),
+                xlab = bquote(~Log[2]~ 'fold change'),
+                xlim = c(-2, 5),
+                ylim = c(0, -log10(10e-6)),
+                pCutoff = 50e-3,
+                FCcutoff = 0.0,
+                pointSize = 2,
+                labSize = 2.0,
+                labCol = 'black',
+                labFace = 'bold',
+                boxedLabels = FALSE,
+                colAlpha = 4/5,
+                legendPosition = 'none',
+                legendLabSize = 14,
+                legendIconSize = 4.0,
+                typeConnectors ='closed',
+                drawConnectors = TRUE,
+                widthConnectors = 0.5,
+                colConnectors = 'black',
+                col=c('black','grey','grey','aquamarine4'),
+                subtitle = NULL,
+                title=NULL)
+
+EnhancedVolcano(brain_res_wtvsnb2,
+                lab = rownames(brain_res_wtvsnb2),
+                x = 'log2FoldChange',
+                y = 'padj',
+                selectLab = c(NA),
+                xlab = bquote(~Log[2]~ 'fold change'),
+                xlim = c(-1, 2),
+                ylim = c(0, -log10(10e-6)),
+                pCutoff = 50e-3,
+                FCcutoff = 0.0,
+                pointSize = 2,
+                labSize = 2.0,
+                labCol = 'black',
+                labFace = 'bold',
+                boxedLabels = FALSE,
+                colAlpha = 4/5,
+                legendPosition = 'none',
+                legendLabSize = 14,
+                legendIconSize = 4.0,
+                typeConnectors ='closed',
+                drawConnectors = TRUE,
+                widthConnectors = 0.5,
+                colConnectors = 'black',
+                col=c('black','grey','grey','deepskyblue4'),
+                subtitle = NULL,
+                title=NULL)
+
+EnhancedVolcano(brain_res_nb1vsnb2,
+                lab = rownames(brain_res_nb1vsnb2),
+                x = 'log2FoldChange',
+                y = 'padj',
+                selectLab = c(NA),
+                xlab = bquote(~Log[2]~ 'fold change'),
+                xlim = c(-1, 6),
+                ylim = c(0, -log10(10e-6)),
+                pCutoff = 50e-3,
+                FCcutoff = 0.0,
+                pointSize = 2,
+                labSize = 2.0,
+                labCol = 'black',
+                labFace = 'bold',
+                boxedLabels = FALSE,
+                colAlpha = 4/5,
+                legendPosition = 'none',
+                legendLabSize = 14,
+                legendIconSize = 4.0,
+                typeConnectors ='closed',
+                drawConnectors = TRUE,
+                widthConnectors = 0.5,
+                colConnectors = 'black',
+                col=c('black','grey','grey','deepskyblue4'),
+                subtitle = NULL,
+                title=NULL)
+
+
+#Identifying genes outliers from the count matrix
+#Using Outrider (https://bioconductor.org/packages/release/bioc/html/OUTRIDER.html) 
+
+library(OUTRIDER)
+setwd("C:/Users/molen/Desktop/transcriptomics_analysis/Quantification output files/Quantification_v2_brains/Outrider")
+list.files("C:/Users/molen/Desktop/transcriptomics_analysis/Quantification output files/Quantification_v2_brains/Outrider")
+
+#Load dataset
+ctsTable <- read.csv("brain_gene_count_matrix2.csv",row.names="gene_id",check.names=FALSE)
+head(ctsTable)
+sapply(ctsTable, class)
+ods<- OutriderDataSet(countData=ctsTable)
+
+#filter out non expressed genes
+ods <- filterExpression(ods, minCounts=TRUE, filterGenes=TRUE)
+
+#Run outrider pipeline
+ods <- OUTRIDER(ods)
