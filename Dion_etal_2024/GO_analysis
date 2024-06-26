@@ -1,0 +1,70 @@
+#GO ENRICHMENT ANALYSIS
+#We use clusterProfiler
+
+#Loading folder and packages
+setwd("C:/Users/molen/Desktop/transcriptomics_analysis/GO_analyses")
+list.files("C:/Users/molen/Desktop/transcriptomics_analysis/GO_analyses") 
+
+library(clusterProfiler) #to do the gsea
+library(enrichplot)
+library(grid)
+library(genefilter)
+library(pheatmap)
+library(VennDiagram)
+library(ggplot2)
+library(RColorBrewer)
+library(EnhancedVolcano)
+library(tidyverse)
+library(ggpubr)
+library(gridExtra)
+library(yarrr)
+library(plyr)
+library(goseq)
+library(tximport)
+library(GenomicFeatures)
+library(ggfortify)
+library(rgl)
+library(car)
+library(plot3D)
+library(dplyr)
+library(tidyr)
+
+#Shaping the go2gene file from annotation output
+#On excel, prepare the csv with geneid+ different GOs in different columns. Remove the capital letters. 
+
+data_frame<-read.csv('go2gene_ass_prep.csv',header=F,sep=",",fileEncoding = 'UTF-8-BOM') #file encoding removes the weird signs before the name of the first row
+head(data_frame)
+
+newframe<-pivot_longer(data_frame,cols=2:100,names_to="GOtype",values_to="GO") 
+newframe<-subset(newframe,select=-GOtype) 
+newframe<- newframe %>% 
+  mutate(across(everything(),~na_if(., ""))) 
+newframe<-na.omit(newframe)
+head(newframe) 
+
+write.csv(as.data.frame(newframe),file="go2gene_assembly.csv") #Remove first column & line in excel, make GO first column, remove space before GO
+
+# Import the files
+go2name_data=read.csv("GO2name.csv",header = FALSE,sep=",") #all go and corresponding names
+GO2gene_data=read.table("go2gene_assembly.csv",header = FALSE, sep=",") #ref go in all genome or transcriptome
+head(go2name_data)
+head(GO2gene_data)
+
+mylist_all <- read.csv("mylist_DSG.csv",header = T,sep=",")
+names(mylist_all)=c("MvsN","NvsWt","WtvsNB1","WtvsNB2","NB1vsNB2")
+head(mylist_all)
+
+# GO enrichment analysis
+background=GO2gene_data
+clusterenrich <- compareCluster(mylist_all, fun='enricher',TERM2GENE=background,TERM2NAME=go2name_data,pvalueCutoff = 0.05, pAdjustMethod = "BH")
+head(clusterenrich)
+write.csv(as.data.frame(clusterenrich),file="GO_DSG&DEG.csv") #export all results.
+
+# Draw dot plot
+#Insert only names of significant comparisons
+dot=dotplot(clusterenrich,showCategory=10,includeAll=TRUE,color="pvalue")
+dot=dot+ggpubr::rotate_x_text()
+dot=dot+scale_y_discrete(label = function(x) stringr::str_trunc(x, 50))
+dot=dot+scale_x_discrete(label=c("MvsN","NvsWt","WtvsNB1","WtvsNB2", "NB1vsNB2"))
+dot
+ggsave("GO_DSG.png",plot=dot())
