@@ -1,0 +1,10 @@
+#SUBSETTING GENE SEQUENCES FROM ASSEMBLY TO NEW FILE
+library(seqinr)
+setwd("C:/Users/molen/Desktop/transcriptomics_analysis/annotation/Annotation_brain_march23") 
+list.files("C:/Users/molen/Desktop/transcriptomics_analysis/annotation/Annotation_brain_march23") 
+
+fastafile<-read.fasta(file="stringtie_brain_assembly_short.fa",seqtype="DNA",as.string=TRUE,set.attributes=FALSE)
+subsetlist<-read.table(file="brain_DEG&DSG.txt",header=F)
+my_fasta_sub <- fastafile [names (fastafile) %in% subsetlist$V1]
+write.fasta(sequences=my_fasta_sub,names=names(my_fasta_sub),file.out="brain_DEG&DSG_seq.fasta")
+
