@@ -1,0 +1,59 @@
+#ORCO MATE CHOICE EXPERIMENT DATA ANALYSIS
+#DATA COLLECTION BY RUOXIN
+#MS IN PREP
+
+#Data exploration and package loading
+library(lme4) #models
+library(rcompanion) #model pvalue
+library(car) #model pvalue
+library(multcompView) #post-hoc
+library(emmeans) #post-hoc
+library(Rmisc) #for summarySE
+library(geepack)#for model with correlated data 
+library(contrast)#for posthoc
+library(coin)#For permutation t tests
+library(pwr)#for power analysis
+library(ggplot2)#builds plots
+library(ggpubr)#merge 2 ggplots 
+
+#Test female preference 
+observed=c(28,11) #here, input the observed number of choice for wt male first, blocked male second
+theoretical=c(0.5,0.5) #here the theoretical proportions we compare the data to
+test=chisq.test(x=observed,p=theoretical)#perform the test
+test
+
+#power analysis: how much individuals for orco to prefer?
+P0=0.6
+P1=0.5
+H=ES.h(P0,P1) #calculates effect size
+pwr.p.test(h=H,n=NULL,sig.level=0.05,power=0.90,alternative="two.sided")
+
+
+#Test treatment effect on female choice
+data=rbind(c(28,11),c(12,8))
+colnames(data)=c("controlchosen","bananachosen")
+rownames(data)=c("Wt","orco")
+data
+fisher.test(data)
+
+#Female rejection latency
+attach(data)
+summary<-summarySE(data=data,measurevar="Duration",groupvars=c("FMutStatus","MGlandStatus"),conf.interval=0.95)
+summary
+
+Durationplot<-ggplot(data) +
+  aes(x=FMutStatus,y=Duration) +
+  geom_point(alpha=0.5,position = position_jitter(width = .2), aes(color=FMutStatus)) +
+  theme(legend.position="none") +
+  facet_wrap(~MGlandStatus) + 
+  stat_summary(fun.data=mean_cl_normal,geom = "errorbar")  
+Durationplot
+
+Durationplot2<-ggplot(summary) +
+  aes(x=FMutStatus,y=Duration) +
+  theme(legend.position="none") +
+  facet_wrap(~MGlandStatus) +
+  geom_jitter(alpha=0.5,position = position_jitter(width = .2))
+Durationplot2  
+
+stat_summary(fun.data=mean,geom="point",size=2)
