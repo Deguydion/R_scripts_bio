@@ -1,0 +1,78 @@
+#ORCO MATING LATENCY ANALYSIS
+#DATA COLLECTION BY RUOXIN
+#MS IN PREP
+
+library(ggplot2)
+library(Rmisc)
+library(RColorBrewer)
+library(wesanderson)
+library(svglite)
+
+setwd("C:/Users/molen/OneDrive/Documents/Results/CRISPR/ORCO/Latency Ruoxin")
+list.files("C:/Users/molen/OneDrive/Documents/Results/CRISPR/ORCO/Latency Ruoxin")
+
+data=read.table("latency_data.txt",header=TRUE)
+head(data)
+summarySE(data=data,measurevar="duration",groupvars=c("mutation","gland"),conf.interval=0.95,na.rm=TRUE)
+
+plot<-ggplot(data,aes(x=mutation,y=duration,color=gland,group=interaction(gland))) +
+  facet_wrap(~gland) +
+  geom_jitter(aes(colour=mutation),width = 0.25, size=2.5,shape=1) +
+  scale_color_manual(values=c('black','#E1D223'))+
+  theme (panel.background = element_rect(fill = "grey96"))
+plot
+
+ggsave("latency1.png")
+ggsave("latency1.pdf")
+ggsave("latency1.svg")
+
+plot<-ggplot(data,aes(x=mutation,y=duration,color=gland,group=interaction(gland))) +
+  ylim(0,60) +
+  facet_wrap(~gland) +
+  geom_jitter(aes(colour=mutation),width = 0.25, size=2.5,shape=1) +
+  scale_color_manual(values=c('black','#E1D223'))+
+  theme (panel.background = element_rect(fill = "grey96"))
+plot
+
+ggsave("latency60.png")
+ggsave("latency60.pdf")
+ggsave("latency60.svg")
+
+plot<-ggplot(data,aes(x=mutation,y=duration,color=gland,group=interaction(gland))) +
+  ylim(60,150) +
+  facet_wrap(~gland) +
+  geom_jitter(aes(colour=mutation),width = 0.25, size=2.5,shape=1) +
+  scale_color_manual(values=c('black','#E1D223'))+
+  theme (panel.background = element_rect(fill = "grey96"))
+plot
+
+ggsave("latency60-150.png")
+ggsave("latency60-150.pdf")
+ggsave("latency60-150.svg")
+
+
+#Statistical analysis 
+library(lmtest)
+library(lme4) 
+library(rcompanion) 
+library(car) 
+library(multcompView) 
+library(emmeans) 
+library(Rmisc)
+
+setwd("C:/Users/molen/OneDrive/Documents/Results/CRISPR/ORCO/Latency Ruoxin")
+list.files("C:/Users/molen/OneDrive/Documents/Results/CRISPR/ORCO/Latency Ruoxin")
+data=read.table("latency_data_all.txt",header=TRUE)
+head(data)
+summarySE(data=data,measurevar="duration",groupvars=c("mutation","gland"),conf.interval=0.95,na.rm=TRUE)
+
+model<-glmer(duration~gland*mutation+(1 | id),data=data,family=poisson(link="log"))
+model.fixed<-glm(duration~gland*mutation,data=data,family=poisson(link="log"))
+Anova(model,test.statistic="F")
+anova(model,model.fixed)
+summary(model)
+
+marginal=emmeans(model,~mutation:gland)
+pairs(marginal,adjust="tukey")
+confint(marginal,adjust="Tukey",level=0.95)
+eff_size(marginal,sigma=sigma(model),edf=Inf)
